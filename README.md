@@ -23,7 +23,7 @@ The current album cover becomes the sleeve, the record label, the cassette stick
 
 - Works with **Spotify** and **Apple Music**
 - Lives in the menu bar — no Dock icon. Left click for the panel (now playing, progress, ⏮ ⏯ ⏭, scenes), right click for a quick scene menu
-- Animated with Core Animation, so idle CPU stays near zero
+- Easy on the battery: animations run on the GPU via Core Animation, capped at 30 fps, and stop entirely when the desktop is covered, an app is full screen, or Low Power Mode is on. Players are polled only every 15 s — track changes arrive as notifications
 - Optional: hide the scene while paused, switch the room to night after 7 PM, launch at login
 - Multiple displays supported
 - Free and open source (MIT)

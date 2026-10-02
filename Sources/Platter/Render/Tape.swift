@@ -108,7 +108,7 @@ enum Tape {
         let radii = [hi - (hi - lo) * p, lo + (hi - lo) * p]
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(3)
+        CATransaction.setAnimationDuration(DesktopScene.progressTick)
         CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
         for (pack, r) in zip(packs, radii) {
             pack.bounds = CGRect(x: 0, y: 0, width: 2 * r * k, height: 2 * r * k)

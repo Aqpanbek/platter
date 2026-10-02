@@ -140,7 +140,7 @@ final class BoomboxScene: DesktopScene {
         Tape.wind(packs, progress: progress, range: G.packRange, k: canvas.k, animated: animated)
         CATransaction.begin()
         CATransaction.setDisableActions(!animated)
-        CATransaction.setAnimationDuration(3)
+        CATransaction.setAnimationDuration(Self.progressTick)
         CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
         let x = G.dial.minX + G.dialPad + (G.dial.width - 2 * G.dialPad) * CGFloat(progress)
         needle.position = canvas.point(CGPoint(x: x, y: G.dial.midY))
@@ -158,6 +158,7 @@ final class BoomboxScene: DesktopScene {
             thump.timingFunctions = [CAMediaTimingFunction(name: .easeOut), CAMediaTimingFunction(name: .easeInEaseOut)]
             thump.duration = 60 / 116
             thump.repeatCount = .infinity
+            thump.preferredFrameRateRange = .ambient
             cone.add(thump, forKey: "thump")
         }
         var rng = SplitMix64(seed: 99)
@@ -170,6 +171,7 @@ final class BoomboxScene: DesktopScene {
             eq.values = values
             eq.duration = .random(in: 1.6...2.6, using: &rng)
             eq.repeatCount = .infinity
+            eq.preferredFrameRateRange = .ambient
             meter.add(eq, forKey: "eq")
         }
     }

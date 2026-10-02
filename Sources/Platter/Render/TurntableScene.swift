@@ -72,7 +72,7 @@ final class TurntableScene: DesktopScene {
 
     override func progressDidChange(animated: Bool) {
         guard isPlaying else { return }
-        moveArm(duration: animated ? 3 : 0, timing: .linear)
+        moveArm(duration: animated ? Self.progressTick : 0, timing: .linear)
     }
 
     private func moveArm(duration: CFTimeInterval, timing: CAMediaTimingFunctionName) {

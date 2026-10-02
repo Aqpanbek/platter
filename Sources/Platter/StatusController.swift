@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The menu bar icon: left click opens the Platter panel, right click a quick scene menu.
 /// The same panel also lives in a regular window, for when the icon is hidden behind the notch.
-final class StatusController: NSObject {
+final class StatusController: NSObject, NSPopoverDelegate, NSWindowDelegate {
     private let player: NowPlayingService
     private let prefs: Preferences
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -25,7 +25,21 @@ final class StatusController: NSObject {
         }
 
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(rootView: MenuView(player: player, prefs: prefs))
+        popover.delegate = self
+    }
+
+    /// A fresh panel each time it opens; it is torn down on close so its live progress
+    /// clock doesn't keep ticking in the background.
+    private func makePanel() -> NSViewController {
+        NSHostingController(rootView: MenuView(player: player, prefs: prefs))
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        popover.contentViewController = nil
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        window = nil
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
@@ -42,6 +56,8 @@ final class StatusController: NSObject {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            player.refresh()
+            popover.contentViewController = makePanel()
             NSApp.activate()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
@@ -98,14 +114,16 @@ final class StatusController: NSObject {
     /// Shows the panel as an ordinary window.
     @objc func openWindow() {
         if window == nil {
-            let w = NSWindow(contentViewController: NSHostingController(rootView: MenuView(player: player, prefs: prefs)))
+            let w = NSWindow(contentViewController: makePanel())
             w.title = "Platter"
             w.styleMask = [.titled, .closable]
             w.isReleasedWhenClosed = false
+            w.delegate = self
             w.center()
             window = w
         }
         popover.performClose(nil)
+        player.refresh()
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }

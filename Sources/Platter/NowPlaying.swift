@@ -73,8 +73,10 @@ final class NowPlayingService: ObservableObject {
         for name in ["com.spotify.client.PlaybackStateChanged", "com.apple.Music.playerInfo"] {
             center.addObserver(self, selector: #selector(playerDidChange), name: .init(name), object: nil)
         }
-        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.refresh() }
-        timer?.tolerance = 0.5
+        // The players announce track and play/pause changes themselves; this slow poll only corrects drift
+        // in the position, which is otherwise extrapolated from the last sample.
+        timer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in self?.refresh() }
+        timer?.tolerance = 3
         refresh()
     }
 

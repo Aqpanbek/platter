@@ -113,6 +113,11 @@ enum Vinyl {
     }
 }
 
+extension CAFrameRateRange {
+    /// Slow ambient motion doesn't need ProMotion's 120 Hz; capping it saves GPU time and battery.
+    static let ambient = CAFrameRateRange(minimum: 15, maximum: 30, preferred: 30)
+}
+
 /// Keeps a layer turning (33⅓ rpm by default), pausing and resuming without jumping.
 final class Spinner {
     let layer: CALayer
@@ -133,6 +138,7 @@ final class Spinner {
             a.duration = period
             a.repeatCount = .infinity
             a.isRemovedOnCompletion = false
+            a.preferredFrameRateRange = .ambient
             layer.add(a, forKey: "spin")
         }
         spinning ? resume() : pause()

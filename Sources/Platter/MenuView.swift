@@ -34,7 +34,7 @@ struct MenuView: View {
             Divider()
 
             HStack {
-                Text("Platter 1.0")
+                Text("Platter \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                 Spacer()

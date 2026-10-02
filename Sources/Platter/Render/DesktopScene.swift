@@ -4,6 +4,9 @@ import QuartzCore
 /// A full-screen layer tree painted behind the desktop icons. Subclasses build their layers in
 /// `build()` and react to artwork / playback changes through the `…DidChange` hooks.
 class DesktopScene {
+    /// How often progress is pushed to scenes; progress-driven motion animates over the same span.
+    static let progressTick: CFTimeInterval = 5
+
     let root = CALayer()
     private(set) var canvas = Canvas(size: Canvas.design, scale: 2)
     private(set) var artwork: CGImage?
@@ -13,6 +16,7 @@ class DesktopScene {
     private(set) var title = ""
     private(set) var artist = ""
     private var isBuilt = false
+    private(set) var isSuspended = false
 
     static func make(_ kind: SceneKind) -> DesktopScene {
         switch kind {
@@ -72,6 +76,24 @@ class DesktopScene {
         progress = min(1, max(0, value))
         guard isBuilt else { return }
         progressDidChange(animated: animated)
+    }
+
+    /// Freezes every animation in the scene without losing its place: the whole layer tree runs on
+    /// the root's clock, so stopping that clock stops the GPU work too.
+    func setSuspended(_ suspended: Bool) {
+        guard suspended != isSuspended else { return }
+        isSuspended = suspended
+        if suspended {
+            let t = root.convertTime(CACurrentMediaTime(), from: nil)
+            root.speed = 0
+            root.timeOffset = t
+        } else {
+            let paused = root.timeOffset
+            root.speed = 1
+            root.timeOffset = 0
+            root.beginTime = 0
+            root.beginTime = root.convertTime(CACurrentMediaTime(), from: nil) - paused
+        }
     }
 
     /// Copies artwork and playback state from the scene this one replaces.
