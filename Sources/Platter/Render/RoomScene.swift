@@ -31,25 +31,16 @@ final class RoomScene: DesktopScene {
         static let printSide: CGFloat = 370
     }
 
-    private let night: Bool
+    private var night: Bool { mood == .night }
     private let sleeve = CALayer()
     private let disc = CALayer()
     private var prints: [CALayer] = []
     private lazy var spinner = Spinner(layer: disc)
     private var walnut: CGImage!
 
-    init(night: Bool) {
-        self.night = night
-        super.init()
-    }
-
     override func build() {
         prints.removeAll()
-        walnut = Texture.wood(width: 700, height: 130,
-                              style: WoodStyle(dark: WoodStyle.hex(0x3A2112), mid: WoodStyle.hex(0x5E381E),
-                                               light: WoodStyle.hex(0x845230), rings: 10, streaks: 20, seed: 21)) { nx, ny in
-            (nx * 4, ny * 0.7)
-        }
+        walnut = Texture.wood(width: 900, height: 170, style: .walnut) { nx, ny in (nx * 1.6, ny * 0.3) }
         let full = CGRect(origin: .zero, size: Canvas.design)
         _ = addImageLayer(background(), frame: full)
 
@@ -91,6 +82,8 @@ final class RoomScene: DesktopScene {
             _ = addImageLayer(nightShade(), frame: full)
             _ = addImageLayer(lampHalo(), frame: full)
             _ = addImageLayer(patch(G.lampPatch) { drawLitShade($0) }, frame: G.lampPatch)
+        } else {
+            applyMood(lamps: [])
         }
     }
 
@@ -134,10 +127,10 @@ final class RoomScene: DesktopScene {
         let wall = CGRect(x: 0, y: 0, width: 1600, height: G.deskTop + 2)
         let wallPath = CGPath(rect: wall, transform: nil)
         if let sun {
-            ctx.fill(wallPath, rgb(0xC1AB8B))
+            ctx.fill(wallPath, rgb(mood == .sunset ? 0xB8987A : 0xC1AB8B))
             ctx.saveGState()
             Draw.clip(ctx, toMask: sun, in: wall)
-            ctx.fill(wallPath, rgb(0xF7E8CB))
+            ctx.fill(wallPath, rgb(mood == .sunset ? 0xFFC283 : 0xF7E8CB))
             ctx.restoreGState()
         } else {
             ctx.fill(wallPath, rgb(0xD5C5A9))
@@ -232,14 +225,12 @@ final class RoomScene: DesktopScene {
     private func deskTexture(unit: CGFloat) -> CGImage {
         let h = Double(1040 - G.deskTop)
         let top = Double(G.deskTop)
-        return Texture.wood(width: Int(1600 * unit * 0.5), height: Int(CGFloat(h) * unit * 0.5),
-                            style: WoodStyle(dark: WoodStyle.hex(0x4A200B), mid: WoodStyle.hex(0x7C3B17),
-                                             light: WoodStyle.hex(0xA65C2A), rings: 6, streaks: 22, seed: 8)) { nx, ny in
+        return Texture.wood(width: Int(1600 * unit * 0.6), height: Int(CGFloat(h) * unit * 0.6), style: .mahogany) { nx, ny in
             // Perspective: equal steps in depth bunch up toward the back edge.
             let y = top + ny * h
             let depth = 705 / (y + 160)
             let x = (nx - 0.5) * 1600 / 700 * depth
-            return (x * 3, depth * 8)
+            return (x * 1.1, depth * 3)
         }
     }
 

@@ -13,6 +13,7 @@ final class DesktopController {
     private var clock: Timer?
     private var progressTimer: Timer?
     private var kind: SceneKind = .turntable
+    private var mood: LightMood = .day
     private var track: Track?
     private var artwork: CGImage?
     private var history: [CGImage] = []
@@ -23,7 +24,8 @@ final class DesktopController {
     }
 
     func start() {
-        kind = prefs.resolvedScene()
+        kind = prefs.scene
+        mood = prefs.lighting.mood()
         rebuildWindows()
 
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
@@ -46,7 +48,7 @@ final class DesktopController {
             .sink { [weak self] track in self?.trackDidChange(track) }
             .store(in: &cancellables)
 
-        prefs.$scene.combineLatest(prefs.$roomFollowsClock)
+        prefs.$scene.combineLatest(prefs.$lighting)
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshScene() }
@@ -78,10 +80,11 @@ final class DesktopController {
 
     /// Switches scenes when the setting, or the clock for a day/night room, calls for another one.
     private func refreshScene() {
-        let resolved = prefs.resolvedScene()
-        guard resolved != kind else { return }
-        kind = resolved
-        windows.forEach { $0.transition(to: resolved) }
+        let newKind = prefs.scene, newMood = prefs.lighting.mood()
+        guard newKind != kind || newMood != mood else { return }
+        kind = newKind
+        mood = newMood
+        windows.forEach { $0.transition(to: newKind, mood: newMood) }
     }
 
     private func trackDidChange(_ track: Track?) {
@@ -109,7 +112,7 @@ final class DesktopController {
     private func rebuildWindows() {
         windows.forEach { $0.close() }
         windows = NSScreen.screens.map { screen in
-            let w = DesktopWindow(screen: screen, kind: kind)
+            let w = DesktopWindow(screen: screen, kind: kind, mood: mood)
             w.lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
             w.scene.setArtwork(artwork, history: history, animated: false)
             w.scene.setTrackInfo(title: track?.title ?? "", artist: track?.artist ?? "", animated: false)
@@ -133,9 +136,9 @@ final class DesktopWindow: NSWindow {
         didSet { updateSuspension() }
     }
 
-    init(screen: NSScreen, kind: SceneKind) {
+    init(screen: NSScreen, kind: SceneKind, mood: LightMood) {
         host = NSView(frame: CGRect(origin: .zero, size: screen.frame.size))
-        scene = DesktopScene.make(kind)
+        scene = DesktopScene.make(kind, mood: mood)
         super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
 
         level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
@@ -184,10 +187,10 @@ final class DesktopWindow: NSWindow {
         host.layer?.addSublayer(scene.root)
     }
 
-    /// Cross-fades to a freshly built scene of another kind.
-    func transition(to kind: SceneKind) {
+    /// Cross-fades to a freshly built scene (another kind, or the same one in different light).
+    func transition(to kind: SceneKind, mood: LightMood) {
         let old = scene
-        let new = DesktopScene.make(kind)
+        let new = DesktopScene.make(kind, mood: mood)
         new.adoptState(from: old)
         install(new)
         scene = new

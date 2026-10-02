@@ -42,6 +42,7 @@ final class BoomboxScene: DesktopScene {
     private var keys: [CALayer] = []
     private var cones: [CALayer] = []
     private var meters: [CALayer] = []
+    private var bars: [CALayer] = []
     private var packs: [CALayer] = []
     private var spinners: [Spinner] = []
 
@@ -49,6 +50,7 @@ final class BoomboxScene: DesktopScene {
         keys.removeAll()
         cones.removeAll()
         meters.removeAll()
+        bars.removeAll()
         let full = CGRect(origin: .zero, size: Canvas.design)
         let k = canvas.k
         _ = addImageLayer(background(), frame: full)
@@ -98,6 +100,7 @@ final class BoomboxScene: DesktopScene {
             meter.position = CGPoint(x: bar.bounds.midX, y: 0)
             bar.mask = meter
             root.addSublayer(bar)
+            bars.append(bar)
             meters.append(meter)
         }
 
@@ -110,6 +113,16 @@ final class BoomboxScene: DesktopScene {
         root.addSublayer(needle)
 
         _ = addImageLayer(lighting(), frame: full)
+
+        var glowing = bars.enumerated().map { i, bar in Glow(layer: bar, halo: i == 0 ? G.eq : nil, color: 0x3BFF7A) }
+        if mood == .night {
+            let dialGlow = addImageLayer(patch(G.dial) { drawDial($0, backlit: true) }, frame: G.dial)
+            glowing.insert(Glow(layer: dialGlow, halo: G.dial, color: 0xFFB347), at: 0)
+        }
+        glowing.append(Glow(layer: needle))
+        applyMood(lamps: [Lamp(center: CGPoint(x: 250, y: 440), radius: 430, strength: 0.75),
+                          Lamp(center: CGPoint(x: 920, y: 560), radius: 380, strength: 0.35)],
+                  glowing: glowing)
     }
 
     override func artworkDidChange(animated: Bool) {
@@ -196,14 +209,14 @@ final class BoomboxScene: DesktopScene {
                                     base: WoodStyle.hex(0xE2AD8C), seed: 51)
         let floor = Texture.concrete(width: Int(1600 * unit * 0.5), height: Int((1040 - G.floorY) * unit * 0.5),
                                      scale: Double(unit * 0.5), base: WoodStyle.hex(0x8A7F76), seed: 52)
-        let sun = sunlight()
+        let sun = mood == .night ? nil : sunlight()
         return Draw.image(size: canvas.size, ppu: canvas.scale) { ctx in
             canvas.enterDesignSpace(ctx)
             let wallRect = CGRect(x: 0, y: 0, width: 1600, height: G.floorY)
             Draw.upright(ctx, wall, in: wallRect)
             ctx.drawLinearGradient(makeGradient([(0, white(1, 0.06)), (0.7, white(0, 0)), (1, white(0, 0.22))]),
                                    start: .zero, end: CGPoint(x: 0, y: G.floorY), options: [])
-            Draw.upright(ctx, sun, in: wallRect)
+            if let sun { Draw.upright(ctx, sun, in: wallRect) }
 
             // Boombox and record shadows on the wall, thrown right by the low sun.
             Draw.castShadow(ctx, .rounded(G.body, 34), dx: 56, dy: -4, blur: 34, color: white(0, 0.28), unit: unit)
@@ -263,7 +276,8 @@ final class BoomboxScene: DesktopScene {
                 }
                 for (a0, a1) in [(0.0, 0.47), (0.53, 1.0)] as [(CGFloat, CGFloat)] {
                     for (b0, b1) in [(0.0, 0.48), (0.52, 1.0)] as [(CGFloat, CGFloat)] {
-                        ctx.fill(.polygon([p(a0, b0), p(a1, b0), p(a1, b1), p(a0, b1)]), rgb(0xFFE0B0, alpha))
+                        ctx.fill(.polygon([p(a0, b0), p(a1, b0), p(a1, b1), p(a0, b1)]),
+                                 rgb(mood == .sunset ? 0xFFB072 : 0xFFE0B0, alpha * (mood == .sunset ? 1.3 : 1)))
                     }
                 }
             }
@@ -308,20 +322,7 @@ final class BoomboxScene: DesktopScene {
         ctx.restoreGState()
         ctx.stroke(.rounded(p.insetBy(dx: 1, dy: 1), 19), white(1, 0.6), width: 1.5)
 
-        // Tuning dial.
-        let d = G.dial
-        ctx.fill(.rounded(d, 6), rgb(0x101317))
-        let scaleWidth = d.width - 2 * G.dialPad
-        for t in 0...40 {
-            let x = d.minX + G.dialPad + scaleWidth * CGFloat(t) / 40
-            ctx.line(CGPoint(x: x, y: d.maxY - 4), CGPoint(x: x, y: d.maxY - (t % 5 == 0 ? 12 : 7)), white(1, 0.45), width: 1)
-        }
-        for (i, f) in ["88", "92", "96", "100", "104", "108"].enumerated() {
-            Draw.text(f, at: CGPoint(x: d.minX + G.dialPad + scaleWidth * CGFloat(i) / 5, y: d.minY + 3), size: 9.5,
-                      weight: .semibold, color: white(1, 0.7), centered: true)
-        }
-        Draw.text("FM", at: CGPoint(x: d.minX + 8, y: d.minY + 3), size: 9, weight: .bold, color: rgb(0xFF8A3D))
-        Draw.text("MHz", at: CGPoint(x: d.maxX - 24, y: d.minY + 4), size: 8, weight: .bold, color: white(1, 0.5))
+        drawDial(ctx, backlit: false)
 
         // Tweeters.
         for t in G.tweeters {
@@ -391,6 +392,30 @@ final class BoomboxScene: DesktopScene {
         Draw.text("PLATTER", at: CGPoint(x: b.midX, y: 704), size: 24, weight: .heavy, color: rgb(0x2A2B2E), kern: 4, centered: true)
         Draw.text("STEREO RADIO CASSETTE", at: CGPoint(x: b.midX, y: 736), size: 8.5, weight: .bold,
                   color: white(0.2, 0.65), kern: 2, centered: true)
+    }
+
+    /// The tuning scale; `backlit` is the night version, glowing amber.
+    private func drawDial(_ ctx: CGContext, backlit: Bool) {
+        let d = G.dial
+        if backlit {
+            ctx.fill(.rounded(d, 6), linear: makeGradient([(0, rgb(0x5A3410)), (0.5, rgb(0x7A4A16)), (1, rgb(0x4A2A0C))]),
+                     from: CGPoint(x: 0, y: d.minY), to: CGPoint(x: 0, y: d.maxY))
+        } else {
+            ctx.fill(.rounded(d, 6), rgb(0x101317))
+        }
+        let ink = backlit ? rgb(0xFFE9C4) : white(1, 0.45)
+        let scaleWidth = d.width - 2 * G.dialPad
+        for t in 0...40 {
+            let x = d.minX + G.dialPad + scaleWidth * CGFloat(t) / 40
+            ctx.line(CGPoint(x: x, y: d.maxY - 4), CGPoint(x: x, y: d.maxY - (t % 5 == 0 ? 12 : 7)), ink, width: 1)
+        }
+        for (i, f) in ["88", "92", "96", "100", "104", "108"].enumerated() {
+            Draw.text(f, at: CGPoint(x: d.minX + G.dialPad + scaleWidth * CGFloat(i) / 5, y: d.minY + 3), size: 9.5,
+                      weight: .semibold, color: backlit ? rgb(0xFFF1D8) : white(1, 0.7), centered: true)
+        }
+        Draw.text("FM", at: CGPoint(x: d.minX + 8, y: d.minY + 3), size: 9, weight: .bold, color: rgb(0xFF8A3D))
+        Draw.text("MHz", at: CGPoint(x: d.maxX - 24, y: d.minY + 4), size: 8, weight: .bold,
+                  color: backlit ? rgb(0xFFE9C4) : white(1, 0.5))
     }
 
     private func coneArt() -> CGImage {

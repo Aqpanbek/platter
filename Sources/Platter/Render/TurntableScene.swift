@@ -26,6 +26,7 @@ final class TurntableScene: DesktopScene {
     private let disc = CALayer()
     private let arm = CALayer()
     private var startButton = CALayer()
+    private var led = CALayer()
     private lazy var spinner = Spinner(layer: disc)
 
     override func build() {
@@ -57,6 +58,15 @@ final class TurntableScene: DesktopScene {
         root.addSublayer(arm)
 
         _ = addImageLayer(windowLight(), frame: CGRect(origin: .zero, size: Canvas.design))
+
+        let ledCenter = CGPoint(x: G.startButton.x + 38, y: G.startButton.y)
+        let ledRect = CGRect(center: ledCenter, radius: 7)
+        led = addImageLayer(patch(ledRect) { ctx in
+            ctx.fill(.ellipse(CGRect(center: ledCenter, radius: 4.5)), radial: makeGradient([(0, rgb(0xFFB0A0)), (0.5, rgb(0xFF3B2F)), (1, rgb(0xA01810))]),
+                     center: CGPoint(x: ledCenter.x - 1, y: ledCenter.y - 1.5), radius: 5)
+        }, frame: ledRect)
+        applyMood(lamps: [Lamp(center: CGPoint(x: 990, y: 480), radius: 470)],
+                  glowing: [Glow(layer: led, halo: ledRect.insetBy(dx: -10, dy: -10), color: 0xFF3B2F)])
     }
 
     override func artworkDidChange(animated: Bool) {
@@ -68,6 +78,7 @@ final class TurntableScene: DesktopScene {
         spinner.set(spinning: isPlaying)
         moveArm(duration: animated ? 1.4 : 0, timing: .easeInEaseOut)
         if animated { squeeze(startButton) }
+        led.opacity = isPlaying ? 1 : 0.25
     }
 
     override func progressDidChange(animated: Bool) {
@@ -104,11 +115,10 @@ final class TurntableScene: DesktopScene {
 
     private func background() -> CGImage {
         let unit = canvas.unit
-        let woodScale = 0.5
+        let woodScale = 0.75
         let wood = Texture.wood(
             width: Int(Canvas.design.width * unit * woodScale), height: Int(Canvas.design.height * unit * woodScale),
-            style: WoodStyle(dark: WoodStyle.hex(0x6E300E), mid: WoodStyle.hex(0xA6511C),
-                             light: WoodStyle.hex(0xCB7A38), rings: 14, streaks: 70, seed: 4)
+            style: .teak
         ) { nx, ny in (nx * 1.6, ny * 1.04) }
 
         return Draw.image(size: canvas.size, ppu: canvas.scale) { ctx in
@@ -251,7 +261,8 @@ final class TurntableScene: DesktopScene {
     private func windowLight() -> CGImage {
         let img = Draw.image(size: Canvas.design, ppu: 0.25) { ctx in
             let slant: CGFloat = 0.62, width: CGFloat = 150, h: CGFloat = 1200
-            for x0 in stride(from: CGFloat(-1000), through: 1900, by: 640) {
+            // No window shadows once the sun is down.
+            for x0 in stride(from: CGFloat(-1000), through: 1900, by: 640) where mood != .night {
                 ctx.fill(.polygon([
                     CGPoint(x: x0, y: -60), CGPoint(x: x0 + width, y: -60),
                     CGPoint(x: x0 + width + slant * h, y: h), CGPoint(x: x0 + slant * h, y: h),

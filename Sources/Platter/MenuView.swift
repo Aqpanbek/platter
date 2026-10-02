@@ -25,8 +25,20 @@ struct MenuView: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Lighting")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Picker("Lighting", selection: $prefs.lighting) {
+                    ForEach(Lighting.allCases) { light in
+                        Label(light.title, systemImage: light.symbol).tag(light)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+            }
+
             VStack(spacing: 8) {
-                SettingRow(title: "Room turns to night after 7 PM", isOn: $prefs.roomFollowsClock)
                 SettingRow(title: "Hide when paused", isOn: $prefs.hideWhenPaused)
                 SettingRow(title: "Launch at login", isOn: $prefs.launchAtLogin)
             }

@@ -78,10 +78,18 @@ final class StatusController: NSObject, NSPopoverDelegate, NSWindowDelegate {
             menu.addItem(mi)
         }
         menu.addItem(.separator())
-        let clock = NSMenuItem(title: "Room Turns to Night After 7 PM", action: #selector(toggleRoomClock), keyEquivalent: "")
-        clock.target = self
-        clock.state = prefs.roomFollowsClock ? .on : .off
-        menu.addItem(clock)
+        let lightHeader = NSMenuItem(title: "Lighting", action: nil, keyEquivalent: "")
+        lightHeader.isEnabled = false
+        menu.addItem(lightHeader)
+        for light in Lighting.allCases {
+            let mi = NSMenuItem(title: light.title, action: #selector(pickLighting(_:)), keyEquivalent: "")
+            mi.target = self
+            mi.representedObject = light.rawValue
+            mi.state = prefs.lighting == light ? .on : .off
+            mi.image = NSImage(systemSymbolName: light.symbol, accessibilityDescription: nil)
+            menu.addItem(mi)
+        }
+        menu.addItem(.separator())
         let hide = NSMenuItem(title: "Hide When Paused", action: #selector(toggleHideWhenPaused), keyEquivalent: "")
         hide.target = self
         hide.state = prefs.hideWhenPaused ? .on : .off
@@ -103,8 +111,9 @@ final class StatusController: NSObject, NSPopoverDelegate, NSWindowDelegate {
         prefs.scene = kind
     }
 
-    @objc private func toggleRoomClock() {
-        prefs.roomFollowsClock.toggle()
+    @objc private func pickLighting(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let light = Lighting(rawValue: raw) else { return }
+        prefs.lighting = light
     }
 
     @objc private func toggleHideWhenPaused() {

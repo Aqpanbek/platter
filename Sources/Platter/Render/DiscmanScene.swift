@@ -52,6 +52,9 @@ final class DiscmanScene: DesktopScene {
         root.addSublayer(jewelCase)
 
         _ = addImageLayer(lighting(), frame: full)
+        // The LCD is backlit, so it stays readable in the dark.
+        applyMood(lamps: [Lamp(center: CGPoint(x: 980, y: 480), radius: 450), Lamp(center: CGPoint(x: 360, y: 500), radius: 300, strength: 0.4)],
+                  glowing: [Glow(layer: lcd, halo: G.lcd, color: 0x9CFF8A)])
     }
 
     override func artworkDidChange(animated: Bool) {

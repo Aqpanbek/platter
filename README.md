@@ -13,9 +13,18 @@ The current album cover becomes the sleeve, the record label, the cassette stick
 
 | | |
 |---|---|
-| ![Listening Room](docs/screenshots/listeningRoom.jpg) **Listening Room** — sunlit desk, record on the deck, recently played covers in a stack | ![After Hours](docs/screenshots/afterHours.jpg) **After Hours** — the same room at night, lamp on. Can switch automatically at 19:00 / 07:00 |
-| ![Turntable](docs/screenshots/turntable.jpg) **Turntable** — top-down deck; the tonearm drops in when you press play and tracks the song's progress | ![Cassette](docs/screenshots/cassette.jpg) **Cassette** — portable tape player; Play latches down, spools wind as the track plays |
-| ![Discman](docs/screenshots/discman.jpg) **Discman** — the disc printed with the cover spins under a smoked lid, LCD shows progress | ![Boombox](docs/screenshots/boombox.jpg) **Boombox** — thumping speakers, dancing EQ, a tuning needle that follows the song |
+| ![Room](docs/screenshots/room.jpg) **Room** — desk against a wall: the album on a stand, the record on the deck, recently played covers in a stack | ![Turntable](docs/screenshots/turntable.jpg) **Turntable** — top-down deck on a planked table; the tonearm drops in when you press play and tracks the song's progress |
+| ![Cassette](docs/screenshots/cassette.jpg) **Cassette** — portable tape player; Play latches down, spools wind as the track plays | ![Discman](docs/screenshots/discman.jpg) **Discman** — the disc printed with the cover spins under a smoked lid, LCD shows progress |
+| ![Boombox](docs/screenshots/boombox.jpg) **Boombox** — thumping speakers, dancing EQ, a tuning needle that follows the song | |
+
+## Lighting
+
+Every scene comes in **Day**, **Sunset** and **Night**, or **Auto** to follow the clock (day 07–17, sunset 17–20, night after). At night a lamp lights the scene and anything with its own light — LEDs, the Discman's LCD, the Boombox's dial and EQ — keeps glowing.
+
+| Day | Sunset | Night |
+|---|---|---|
+| ![Room, day](docs/screenshots/room.jpg) | ![Room, sunset](docs/screenshots/room-sunset.jpg) | ![Room, night](docs/screenshots/room-night.jpg) |
+| ![Boombox, day](docs/screenshots/boombox.jpg) | ![Boombox, sunset](docs/screenshots/boombox-sunset.jpg) | ![Boombox, night](docs/screenshots/boombox-night.jpg) |
 
 *Screenshots use made-up sample covers; in use you'll see your own albums.*
 
@@ -24,7 +33,7 @@ The current album cover becomes the sleeve, the record label, the cassette stick
 - Works with **Spotify** and **Apple Music**
 - Lives in the menu bar — no Dock icon. Left click for the panel (now playing, progress, ⏮ ⏯ ⏭, scenes), right click for a quick scene menu
 - Easy on the battery: animations run on the GPU via Core Animation, capped at 30 fps, and stop entirely when the desktop is covered, an app is full screen, or Low Power Mode is on. Players are polled only every 15 s — track changes arrive as notifications
-- Optional: hide the scene while paused, switch the room to night after 7 PM, launch at login
+- Optional: hide the scene while paused, launch at login
 - Multiple displays supported
 - Free and open source (MIT)
 
@@ -62,11 +71,11 @@ swift build -c release && .build/release/Platter --render /tmp/platter
 
 - **Now playing** — `Sources/Platter/NowPlaying.swift` asks Spotify and Music over AppleScript (and listens to their playback notifications) for the track, its position and the artwork. If a cover can't be read from the player, it is looked up in the iTunes Search API.
 - **Desktop** — `Sources/Platter/DesktopController.swift` puts a borderless, click-through window on every screen at desktop level: above the wallpaper, below your icons.
-- **Scenes** — `Sources/Platter/Render/` draws every scene procedurally with Core Graphics (wood, concrete and felt textures are generated noise; no image assets). Motion is Core Animation: spinning records and spools, key presses, the tonearm, speaker thump and cross-fades on track change.
+- **Scenes** — `Sources/Platter/Render/` draws every scene procedurally with Core Graphics (wood is grown from simulated tree rings and boards, concrete and felt are generated noise; no image assets). Motion is Core Animation: spinning records and spools, key presses, the tonearm, speaker thump and cross-fades on track change.
 
 ### Adding a scene
 
-Subclass `DesktopScene`, lay out your layers in `build()` on the 1600×1040 design canvas, react in `artworkDidChange`, `playbackDidChange`, `progressDidChange` and `trackSkipped`, then add a case to `SceneKind`.
+Subclass `DesktopScene`, lay out your layers in `build()` on the 1600×1040 design canvas, react in `artworkDidChange`, `playbackDidChange`, `progressDidChange` and `trackSkipped`, call `applyMood(lamps:glowing:)` at the end of `build()` so it gets sunset and night lighting, then add a case to `SceneKind`.
 
 ## Privacy
 

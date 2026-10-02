@@ -7,16 +7,19 @@ enum PreviewRenderer {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let covers = SampleArt.all
         for kind in SceneKind.allCases {
+          for mood in LightMood.allCases {
             let start = Date()
-            let scene = DesktopScene.make(kind)
+            let name = "\(kind.rawValue)-\(mood.rawValue)"
+            let scene = DesktopScene.make(kind, mood: mood)
             scene.setArtwork(covers[0], history: Array(covers.dropFirst()), animated: false)
             scene.setTrackInfo(title: "Golden Hour", artist: "The Sample Covers", animated: false)
             scene.setPlaying(true, animated: false)
             scene.setProgress(0.3, animated: false)
             scene.layout(size: size, scale: scale)
             let image = snapshot(scene.root, size: size, scale: scale)
-            write(image, to: dir.appendingPathComponent("\(kind.rawValue).png"))
-            print("\(kind.rawValue): \(String(format: "%.2f", Date().timeIntervalSince(start)))s")
+            write(image, to: dir.appendingPathComponent("\(name).png"))
+            print("\(name): \(String(format: "%.2f", Date().timeIntervalSince(start)))s")
+          }
         }
         // Menu bar icon at 8×, black on a light bar and tinted white on a dark one.
         let glyph = StatusIcon.make()
@@ -33,6 +36,11 @@ enum PreviewRenderer {
             tinted.draw(in: CGRect(x: 18, y: 0, width: 18, height: 18))
         }
         write(strip, to: dir.appendingPathComponent("status-icon.png"))
+        // Wood swatches.
+        for (name, style) in [("teak", WoodStyle.teak), ("mahogany", WoodStyle.mahogany), ("walnut", WoodStyle.walnut)] {
+            let img = Texture.wood(width: 1200, height: 700, style: style) { ($0 * 1.6, $1 * 0.93) }
+            write(img, to: dir.appendingPathComponent("wood-\(name).png"))
+        }
     }
 
     static func renderIcon(to url: URL) {
@@ -47,9 +55,7 @@ enum PreviewRenderer {
             ctx.saveGState()
             ctx.addPath(shape)
             ctx.clip()
-            let wood = Texture.wood(width: 412, height: 412,
-                                    style: WoodStyle(dark: WoodStyle.hex(0x6E300E), mid: WoodStyle.hex(0xA6511C),
-                                                     light: WoodStyle.hex(0xCB7A38), rings: 6, streaks: 10, seed: 4)) { ($0, $1 * 0.5) }
+            let wood = Texture.wood(width: 600, height: 600, style: .teak) { ($0 * 0.8, $1 * 0.8) }
             Draw.upright(ctx, wood, in: body)
             // Sleeve peeking out behind the record.
             let sleeve = CGRect(x: 190, y: 250, width: 470, height: 470)

@@ -64,6 +64,7 @@ final class CassetteScene: DesktopScene {
         root.addSublayer(jCard)
 
         _ = addImageLayer(lighting(), frame: full)
+        applyMood(lamps: [Lamp(center: CGPoint(x: 960, y: 450), radius: 480), Lamp(center: CGPoint(x: 360, y: 500), radius: 300, strength: 0.4)])
     }
 
     override func artworkDidChange(animated: Bool) {

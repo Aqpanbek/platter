@@ -75,40 +75,93 @@ struct WoodStyle {
     var dark: SIMD3<Double>
     var mid: SIMD3<Double>
     var light: SIMD3<Double>
-    /// Grain lines per unit across the board.
-    var rings: Double = 22
-    /// Streak density across the board.
-    var streaks: Double = 34
+    /// Growth rings per unit of distance from the tree's heart.
+    var rings: Double = 70
+    /// Width of each board across the grain, in wood units; 0 means a single board.
+    var plankWidth: Double = 0
+    /// Strength of the open-pore streaks.
+    var pores: Double = 0.6
+    /// How strongly the rings bend into arches ("cathedrals") along the board.
+    var figure: Double = 1
     var seed: UInt64 = 1
 
     static func hex(_ v: UInt32) -> SIMD3<Double> {
         SIMD3(Double((v >> 16) & 0xFF), Double((v >> 8) & 0xFF), Double(v & 0xFF))
     }
+
+    /// Warm teak / cherry tabletop.
+    static let teak = WoodStyle(dark: hex(0x5E260C), mid: hex(0x9C4A1C), light: hex(0xCF8645), rings: 64, plankWidth: 0.26, seed: 4)
+    /// Dark reddish desk.
+    static let mahogany = WoodStyle(dark: hex(0x3A1606), mid: hex(0x6E3016), light: hex(0xA55A2B), rings: 56, plankWidth: 0.55, seed: 8)
+    /// Walnut trim for small parts.
+    static let walnut = WoodStyle(dark: hex(0x2A170B), mid: hex(0x51311D), light: hex(0x7E5233), rings: 80, pores: 0.8, seed: 21)
 }
 
 enum Texture {
-    /// Procedural wood. `mapping` turns a normalized pixel position (0…1, top-left origin)
-    /// into wood space: u runs along the grain, v across it.
+    /// Procedural wood built the way a board is cut from a log: every board is a slice through
+    /// concentric growth rings around a heart that sits a little below its surface and runs at a
+    /// slight angle, which bends the rings into arches. On top: open pores, fibres, colour drift
+    /// and, for planked surfaces, seams and per-board tone.
+    /// `mapping` turns a normalized pixel position (0…1, top-left origin) into wood space:
+    /// u runs along the grain, v across it.
     static func wood(width: Int, height: Int, style: WoodStyle,
                      mapping: (Double, Double) -> (Double, Double)) -> CGImage {
         let perlin = Perlin(seed: style.seed)
+        let pw = style.plankWidth
         var buf = [UInt8](repeating: 255, count: width * height * 4)
         buf.withUnsafeMutableBufferPointer { out in
             for y in 0..<height {
                 let ny = (Double(y) + 0.5) / Double(height)
                 for x in 0..<width {
                     let (u, v) = mapping((Double(x) + 0.5) / Double(width), ny)
-                    let warp = perlin.fbm(u * 0.45, v * 1.4, octaves: 3)
-                    let ring = (v + warp * 0.035) * style.rings
-                    let r = ring - ring.rounded(.down)
-                    let late = smoothstep(0.72, 0.97, r) * (0.6 + 0.8 * perlin.noise(u * 0.8, ring * 0.37))
-                    let streak = perlin.fbm(u * 0.5 + 17, v * style.streaks, octaves: 5)
-                    let fiber = perlin.noise(u * 30, v * 700)
-                    let tone = perlin.fbm(u * 0.25 + 5, v * 0.9 + 9, octaves: 2)
-                    let t = clamp01(0.58 + 0.46 * streak - 0.17 * late + 0.07 * fiber + 0.26 * tone)
-                    let c = t < 0.5
-                        ? style.dark + (style.mid - style.dark) * (t * 2)
-                        : style.mid + (style.light - style.mid) * ((t - 0.5) * 2)
+
+                    // Which board, and where across it.
+                    var plank = 0.0, across = v - 0.5, seam = Double.infinity
+                    if pw > 0 {
+                        plank = (v / pw).rounded(.down)
+                        across = v - plank * pw - pw / 2
+                        seam = pw / 2 - abs(across)
+                    }
+                    var rng = SplitMix64(seed: style.seed &+ UInt64(bitPattern: Int64(plank + 1000)) &* 7919)
+                    let heartOffset = Double.random(in: -0.35...0.35, using: &rng) * max(pw, 0.4)
+                    let heartDepth = Double.random(in: 0.05...0.24, using: &rng)
+                    let tilt = Double.random(in: -0.07...0.07, using: &rng) * style.figure
+                    let uShift = Double.random(in: 0...50, using: &rng)
+                    let boardTone = Double.random(in: -0.07...0.07, using: &rng)
+                    let uu = u + uShift
+
+                    // The heart meanders slowly along the board; where it nears the surface the rings
+                    // close into arches.
+                    let meander = perlin.fbm(uu * 0.55 + 31, plank * 3.7, octaves: 2) * 0.16 * style.figure
+                    let wobble = perlin.fbm(uu * 0.45, across * 3.2, octaves: 3)
+                    let dv = across - heartOffset - tilt * (u - 0.8) - meander + wobble * 0.02
+                    let dw = heartDepth + perlin.fbm(uu * 0.22 + 7, across * 1.3, octaves: 2) * 0.05
+                    let radius = sqrt(dv * dv + dw * dw) * style.rings
+                    // Years differ: rings vary in width and in how dark their latewood is.
+                    let ring = radius + perlin.fbm(radius * 0.13, 0.37, octaves: 2) * 2.2 + perlin.noise(uu * 0.9, across * 9) * 0.2
+                    let year = ring.rounded(.down)
+                    let t = ring - year
+                    let yearStrength = 0.45 + 0.55 * (0.5 + perlin.noise(year * 0.61 + 0.3, plank * 1.7 + 0.2))
+                    let late = smoothstep(0.6, 0.9, t) * (1 - smoothstep(0.92, 1.0, t) * 0.75) * yearStrength
+
+                    // Pores: long dark flecks, mostly in the earlywood.
+                    let poreNoise = perlin.noise(uu * 2.4, across * 240 + plank * 13)
+                    let pore = smoothstep(0.22, 0.5, poreNoise) * (1 - late * 0.6)
+                    let fibre = perlin.noise(uu * 14, across * 950)
+                    let tone = perlin.fbm(uu * 0.18 + 3, across * 1.1 + plank, octaves: 3)
+                    let mottle = perlin.fbm(uu * 1.4 + 9, across * 6 + plank, octaves: 3)
+
+                    var value = 0.63 + 0.3 * tone + 0.08 * mottle - 0.27 * late - 0.18 * style.pores * pore
+                        + 0.05 * fibre + boardTone
+                    if seam < 0.01 {
+                        // Board seam: a dark groove with a sliver of light on its bevel.
+                        value -= 0.55 * exp(-pow(seam / 0.0018, 2))
+                        value += 0.08 * exp(-pow((seam - 0.0045) / 0.0016, 2))
+                    }
+                    let c0 = clamp01(value)
+                    let c = c0 < 0.5
+                        ? style.dark + (style.mid - style.dark) * (c0 * 2)
+                        : style.mid + (style.light - style.mid) * ((c0 - 0.5) * 2)
                     let i = (y * width + x) * 4
                     out[i] = UInt8(clamping: Int(c.x))
                     out[i + 1] = UInt8(clamping: Int(c.y))
